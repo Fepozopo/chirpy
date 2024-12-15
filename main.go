@@ -14,10 +14,8 @@ func main_helper() int {
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
-	// Define a simple handler for the root path
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, World!"))
-	})
+	// Use http.FileServer as the handler for the root path
+	mux.Handle("/", http.FileServer(http.Dir(".")))
 
 	// Create a new http.Server struct
 	server := &http.Server{
