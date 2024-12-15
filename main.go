@@ -4,16 +4,17 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 )
 
 func main() {
-	os.Exit(main_helper())
+	os.Exit(mainHelper())
 }
 
-func main_helper() int {
+func mainHelper() int {
 	filepathRoot := "."
 	port := "8080"
+
+	apiCfg := &apiConfig{}
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
@@ -26,12 +27,14 @@ func main_helper() int {
 	})
 
 	// Custom FileServer to handle /app/ path
-	mux.Handle("/app/", http.StripPrefix("/app", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		filePath := filepath.Join(filepathRoot, r.URL.Path)
+	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))
+	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fileServer))
 
-		// Serve the file
-		http.ServeFile(w, r, filePath)
-	})))
+	// Metrics endpoint
+	mux.HandleFunc("/metrics", apiCfg.handleMetrics)
+
+	// Reset endpoint
+	mux.HandleFunc("/reset", apiCfg.handleReset)
 
 	// Create a new http.Server struct
 	server := &http.Server{
