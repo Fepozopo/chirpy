@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 func main() {
@@ -19,29 +18,20 @@ func main_helper() int {
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
-	// Custom FileServer to handle all routes dynamically
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Add the readiness endpoint
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// Custom FileServer to handle /app/ path
+	mux.Handle("/app/", http.StripPrefix("/app", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filePath := filepath.Join(filepathRoot, r.URL.Path)
-		file, err := os.Open(filePath)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-		defer file.Close()
-
-		// Get file information
-		fileInfo, err := file.Stat()
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-
-		// Dynamically set the Content-Length header based on the file size
-		w.Header().Set("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
 
 		// Serve the file
-		http.ServeContent(w, r, filePath, fileInfo.ModTime(), file)
-	}))
+		http.ServeFile(w, r, filePath)
+	})))
 
 	// Create a new http.Server struct
 	server := &http.Server{
