@@ -20,10 +20,10 @@ func mainHelper() int {
 	mux := http.NewServeMux()
 
 	// Add the readiness endpoint
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		w.Write([]byte("OK\n"))
 	})
 
 	// Custom FileServer to handle /app/ path
@@ -31,10 +31,10 @@ func mainHelper() int {
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fileServer))
 
 	// Metrics endpoint
-	mux.HandleFunc("/metrics", apiCfg.handleMetrics)
+	mux.HandleFunc("GET /metrics", apiCfg.handleMetrics)
 
 	// Reset endpoint
-	mux.HandleFunc("/reset", apiCfg.handleReset)
+	mux.HandleFunc("POST /reset", apiCfg.handleReset)
 
 	// Create a new http.Server struct
 	server := &http.Server{
