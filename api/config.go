@@ -1,9 +1,9 @@
-package main
+package api
 
 import (
 	"sync/atomic"
 )
 
-type apiConfig struct {
+type ApiConfig struct {
 	fileserverHits atomic.Int32
 }

@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"net/http"
@@ -6,7 +6,7 @@ import (
 )
 
 // handleMetrics returns the current hit counter for the file server in plain text as a number.
-func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	hits := cfg.fileserverHits.Load()
 	w.WriteHeader(http.StatusOK)
@@ -15,7 +15,7 @@ func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 // handleReset resets the file server hit counter to zero and responds with a plain text message
 // indicating that the hits have been reset.
-func (cfg *apiConfig) handleReset(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits.Store(0)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)

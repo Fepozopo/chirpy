@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	api "github.com/Fepozopo/chirpy/api"
 )
 
 func main() {
@@ -11,30 +13,30 @@ func main() {
 }
 
 func mainHelper() int {
-	filepathRoot := "."
+	filepathRoot := "./app"
 	port := "8080"
 
-	apiCfg := &apiConfig{}
+	apiCfg := &api.ApiConfig{}
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
 	// Add the readiness endpoint
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK\n"))
 	})
 
-	// Custom FileServer to handle /app/ path
-	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))
-	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fileServer))
-
 	// Metrics endpoint
-	mux.HandleFunc("GET /metrics", apiCfg.handleMetrics)
+	mux.HandleFunc("GET /api/metrics", apiCfg.HandleMetrics)
 
 	// Reset endpoint
-	mux.HandleFunc("POST /reset", apiCfg.handleReset)
+	mux.HandleFunc("POST /api/reset", apiCfg.HandleReset)
+
+	// Custom FileServer to handle /app/ path
+	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))
+	mux.Handle("/app/", apiCfg.MiddlewareMetricsInc(fileServer))
 
 	// Create a new http.Server struct
 	server := &http.Server{
