@@ -29,10 +29,10 @@ func mainHelper() int {
 	})
 
 	// Metrics endpoint
-	mux.HandleFunc("GET /api/metrics", apiCfg.HandleMetrics)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.HandleMetrics)
 
 	// Reset endpoint
-	mux.HandleFunc("POST /api/reset", apiCfg.HandleReset)
+	mux.HandleFunc("POST /admin/reset", apiCfg.HandleReset)
 
 	// Custom FileServer to handle /app/ path
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))
