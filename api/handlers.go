@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -21,4 +22,32 @@ func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits reset to 0\n"))
+}
+
+// HandleValidChirp validates the request body of a POST request to /api/validate_chirp as a
+// ChirpRequest struct, and checks if the Body field of the request exceeds the 140 character
+// limit. If either of these validations fail, the handler responds with a 400 Bad Request
+// status, encoding an ErrorResponse struct into the response body. If the request is valid,
+// the handler responds with a 200 OK status, encoding a ValidResponse struct into the
+// response body.
+func HandleValidChirp(w http.ResponseWriter, r *http.Request) {
+	// Parse the JSON body of the request into a ChirpRequest struct
+	var chirpRequest ChirpRequest
+	if err := json.NewDecoder(r.Body).Decode(&chirpRequest); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		return
+	}
+
+	// Check if the chirp exceeds the 140 character limit
+	if len(chirpRequest.Body) > 140 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Chirp is too long"})
+		return
+	}
+
+	// Respond with 200 OK and a valid response if the chirp is within the allowed limit
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(ValidResponse{Valid: true})
 }
