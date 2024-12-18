@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // HandleMetrics responds with a simple HTML page displaying the current value of the
@@ -24,12 +25,13 @@ func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hits reset to 0\n"))
 }
 
-// HandleValidChirp validates the request body of a POST request to /api/validate_chirp as a
-// ChirpRequest struct, and checks if the Body field of the request exceeds the 140 character
-// limit. If either of these validations fail, the handler responds with a 400 Bad Request
-// status, encoding an ErrorResponse struct into the response body. If the request is valid,
-// the handler responds with a 200 OK status, encoding a ValidResponse struct into the
-// response body.
+// HandleValidChirp validates and processes a chirp request. It parses the JSON
+// body into a ChirpRequest struct, checks if the chirp exceeds 140 characters,
+// and replaces any profane words with "****". If the request body is invalid or
+// the chirp is too long, it responds with a 400 Bad Request and an error message.
+// Otherwise, it responds with a 200 OK and a CleanedResponse containing the
+// sanitized chirp text.
+
 func HandleValidChirp(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON body of the request into a ChirpRequest struct
 	var chirpRequest ChirpRequest
@@ -46,8 +48,19 @@ func HandleValidChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Define the list of profane words to replace
+	profaneWords := []string{"kerfuffle", "sharbert", "fornax"}
+
+	// Replace profane words with **** in a case-insensitive manner
+	cleanedBody := chirpRequest.Body
+	for _, word := range profaneWords {
+		cleanedBody = strings.ReplaceAll(cleanedBody, word, "****")
+		cleanedBody = strings.ReplaceAll(cleanedBody, strings.Title(word), "****")
+		cleanedBody = strings.ReplaceAll(cleanedBody, strings.ToUpper(word), "****")
+	}
+
 	// Respond with 200 OK and a valid response if the chirp is within the allowed limit
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(ValidResponse{Valid: true})
+	json.NewEncoder(w).Encode(CleanedResponse{CleanedBody: cleanedBody})
 }

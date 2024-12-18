@@ -16,6 +16,6 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-type ValidResponse struct {
-	Valid bool `json:"valid"`
+type CleanedResponse struct {
+	CleanedBody string `json:"cleaned_body"`
 }
