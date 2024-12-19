@@ -51,7 +51,7 @@ func mainHelper() int {
 	// Reset endpoint
 	mux.HandleFunc("POST /admin/reset", apiCfg.HandleReset)
 
-	// Chipr Valdation (validate_chirp) endpoint
+	// Chirp Validation (validate_chirp) endpoint
 	mux.HandleFunc("POST /api/validate_chirp", api.HandleValidChirp)
 
 	// Custom FileServer to handle /app/ path
