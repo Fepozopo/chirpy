@@ -2,10 +2,13 @@ package api
 
 import (
 	"sync/atomic"
+
+	"github.com/Fepozopo/chirpy/internal/database"
 )
 
 type ApiConfig struct {
 	fileserverHits atomic.Int32
+	DbQueries      *database.Queries
 }
 
 type ChirpRequest struct {

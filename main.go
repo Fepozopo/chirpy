@@ -1,11 +1,15 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
 
 	api "github.com/Fepozopo/chirpy/api"
+	database "github.com/Fepozopo/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -16,7 +20,20 @@ func mainHelper() int {
 	filepathRoot := "./app"
 	port := "8080"
 
-	apiCfg := &api.ApiConfig{}
+	// Open a connection to the database
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Printf("Failed to open a connection to the database: %v\n", err)
+	}
+	defer db.Close()
+
+	// Create a new Queries instance and initialize the ApiConfig struct
+	dbQueries := database.New(db)
+	apiCfg := &api.ApiConfig{
+		DbQueries: dbQueries,
+	}
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()

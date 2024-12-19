@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // HandleMetrics responds with a simple HTML page displaying the current value of the
@@ -31,7 +34,6 @@ func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 // the chirp is too long, it responds with a 400 Bad Request and an error message.
 // Otherwise, it responds with a 200 OK and a CleanedResponse containing the
 // sanitized chirp text.
-
 func HandleValidChirp(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON body of the request into a ChirpRequest struct
 	var chirpRequest ChirpRequest
@@ -53,9 +55,10 @@ func HandleValidChirp(w http.ResponseWriter, r *http.Request) {
 
 	// Replace profane words with **** in a case-insensitive manner
 	cleanedBody := chirpRequest.Body
+	caser := cases.Title(language.English)
 	for _, word := range profaneWords {
 		cleanedBody = strings.ReplaceAll(cleanedBody, word, "****")
-		cleanedBody = strings.ReplaceAll(cleanedBody, strings.Title(word), "****")
+		cleanedBody = strings.ReplaceAll(cleanedBody, caser.String(word), "****")
 		cleanedBody = strings.ReplaceAll(cleanedBody, strings.ToUpper(word), "****")
 	}
 
