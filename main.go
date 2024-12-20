@@ -38,20 +38,10 @@ func mainHelper() int {
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
-	// Readiness (healthz) endpoint
-	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK\n"))
-	})
-
-	// Metrics endpoint
+	// Endpoints
+	mux.HandleFunc("GET /api/healthz", apiCfg.HandleHealthz)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.HandleMetrics)
-
-	// Reset endpoint
 	mux.HandleFunc("POST /admin/reset", apiCfg.HandleReset)
-
-	// Chirp Validation (validate_chirp) endpoint
 	mux.HandleFunc("POST /api/validate_chirp", api.HandleValidChirp)
 
 	// Custom FileServer to handle /app/ path

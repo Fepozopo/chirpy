@@ -10,6 +10,12 @@ import (
 	"golang.org/x/text/language"
 )
 
+func (cfg *ApiConfig) HandleHealthz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK\n"))
+}
+
 // HandleMetrics responds with a simple HTML page displaying the current value of the
 // file server hit counter.
 func (cfg *ApiConfig) HandleMetrics(w http.ResponseWriter, r *http.Request) {
