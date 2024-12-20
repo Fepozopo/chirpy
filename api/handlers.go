@@ -10,6 +10,8 @@ import (
 	"github.com/joho/godotenv"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/Fepozopo/chirpy/internal/database"
 )
 
 // HandleHealthz is a simple health-check endpoint that responds with a 200 OK and the
@@ -62,13 +64,7 @@ func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hits reset to 0 and all users deleted\n"))
 }
 
-// HandleValidChirp validates and processes a chirp request. It parses the JSON
-// body into a ChirpRequest struct, checks if the chirp exceeds 140 characters,
-// and replaces any profane words with "****". If the request body is invalid or
-// the chirp is too long, it responds with a 400 Bad Request and an error message.
-// Otherwise, it responds with a 200 OK and a CleanedResponse containing the
-// sanitized chirp text.
-func HandleValidChirp(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) HandleChirps(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON body of the request into a ChirpRequest struct
 	var chirpRequest ChirpRequest
 	if err := json.NewDecoder(r.Body).Decode(&chirpRequest); err != nil {
@@ -95,11 +91,29 @@ func HandleValidChirp(w http.ResponseWriter, r *http.Request) {
 		cleanedBody = strings.ReplaceAll(cleanedBody, caser.String(word), "****")
 		cleanedBody = strings.ReplaceAll(cleanedBody, strings.ToUpper(word), "****")
 	}
+	chirpRequest.Body = cleanedBody
 
-	// Respond with 200 OK and a valid response if the chirp is within the allowed limit
+	// If the chirp is valid, save it in the database
+	chirp, err := cfg.DbQueries.CreateChirp(r.Context(), database.CreateChirpParams(chirpRequest))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to create chirp"})
+		return
+	}
+
+	// Map the chirp struct to a MapChirp struct to control the JSON keys
+	mapChirp := MapChirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
+	}
+
+	// If creating the record goes well, respond with a 201 status code and the full chirp resource
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(CleanedResponse{CleanedBody: cleanedBody})
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(mapChirp)
 }
 
 // HandleCreateUser creates a new user from the email address in the request body
