@@ -12,6 +12,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/Fepozopo/chirpy/internal/auth"
 	"github.com/Fepozopo/chirpy/internal/database"
 )
 
@@ -135,8 +136,16 @@ func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hash the provided password
+	hashedPassword, err := auth.HashPassword(createUserRequest.HashedPassword)
+	if err != nil {
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to hash provided password"})
+		return
+	}
+	createUserRequest.HashedPassword = hashedPassword
+
 	// Create a new user in the database
-	user, err := cfg.DbQueries.CreateUser(r.Context(), createUserRequest.Email)
+	user, err := cfg.DbQueries.CreateUser(r.Context(), database.CreateUserParams(createUserRequest))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to create user"})
@@ -194,6 +203,11 @@ func (cfg *ApiConfig) HandleGetAllChirps(w http.ResponseWriter, r *http.Request)
 	encoder.Encode(mappedChirps)
 }
 
+// HandleGetChirp retrieves a chirp from the database by its ID and returns it
+// as a JSON object in the response. It maps the database chirp record to the
+// MappedChirp struct to ensure consistent JSON keys. If the chirp is found,
+// it responds with a 200 OK status and a valid JSON response. If the chirp is
+// not found, it responds with a 404 status and an error message.
 func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
 	// Get the chirp ID from the path parameter and convert it to a UUID object
 	pathParameter := r.PathValue("chirpID")

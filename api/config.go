@@ -28,7 +28,8 @@ type CleanedResponse struct {
 }
 
 type CreateUserRequest struct {
-	Email string `json:"email"`
+	Email          string `json:"email"`
+	HashedPassword string `json:"password"`
 }
 
 type MappedUser struct {
