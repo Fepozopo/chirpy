@@ -42,8 +42,9 @@ func mainHelper() int {
 	mux.HandleFunc("GET /api/healthz", apiCfg.HandleHealthz)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.HandleMetrics)
 	mux.HandleFunc("POST /admin/reset", apiCfg.HandleReset)
-	mux.HandleFunc("POST /api/chirps", apiCfg.HandleChirps)
+	mux.HandleFunc("POST /api/chirps", apiCfg.HandleCreateChirp)
 	mux.HandleFunc("POST /api/users", apiCfg.HandleCreateUser)
+	mux.HandleFunc("GET /api/chirps", apiCfg.HandleGetAllChirps)
 
 	// Custom FileServer to handle /app/ path
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))

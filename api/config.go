@@ -31,14 +31,14 @@ type CreateUserRequest struct {
 	Email string `json:"email"`
 }
 
-type MapUser struct {
+type MappedUser struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
 }
 
-type MapChirp struct {
+type MappedChirp struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

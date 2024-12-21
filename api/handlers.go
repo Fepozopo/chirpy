@@ -64,7 +64,14 @@ func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hits reset to 0 and all users deleted\n"))
 }
 
-func (cfg *ApiConfig) HandleChirps(w http.ResponseWriter, r *http.Request) {
+// HandleCreateChirp creates a new chirp from the request body and saves it in the
+// database. It also performs some basic validation on the request body, such as
+// checking that the chirp is not too long and that it doesn't contain certain
+// profane words. If the chirp is valid, it responds with a 201 status code and
+// the full chirp resource. If the chirp is invalid, it responds with a 400 status
+// code and an error message. If the server encounters an internal error when
+// saving the chirp, it responds with a 500 status code and an error message.
+func (cfg *ApiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON body of the request into a ChirpRequest struct
 	var chirpRequest ChirpRequest
 	if err := json.NewDecoder(r.Body).Decode(&chirpRequest); err != nil {
@@ -101,8 +108,8 @@ func (cfg *ApiConfig) HandleChirps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Map the chirp struct to a MapChirp struct to control the JSON keys
-	mapChirp := MapChirp{
+	// Map the chirp struct to a MappedChirp struct to control the JSON keys
+	mappedChirp := MappedChirp{
 		ID:        chirp.ID,
 		CreatedAt: chirp.CreatedAt,
 		UpdatedAt: chirp.UpdatedAt,
@@ -113,7 +120,7 @@ func (cfg *ApiConfig) HandleChirps(w http.ResponseWriter, r *http.Request) {
 	// If creating the record goes well, respond with a 201 status code and the full chirp resource
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(mapChirp)
+	json.NewEncoder(w).Encode(mappedChirp)
 }
 
 // HandleCreateUser creates a new user from the email address in the request body
@@ -135,8 +142,8 @@ func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Map user to the User strut in order to control the JSON keys
-	mapUser := MapUser{
+	// Map user to the MappedUser strut in order to control the JSON keys
+	mappedUser := MappedUser{
 		ID:        user.ID,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
@@ -146,5 +153,42 @@ func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	// Respond with 200 OK and a valid response if the user was created successfully
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(mapUser)
+	json.NewEncoder(w).Encode(mappedUser)
+}
+
+// HandleGetAllChirps retrieves all chirps from the database and returns them
+// as a JSON array in the response. It maps the database chirp records to the
+// MappedChirp struct to ensure consistent JSON keys. If the operation is
+// successful, it responds with a 200 OK status and a pretty-printed JSON
+// array of chirps. If there is an error accessing the database, it responds
+// with a 500 status and an error message.
+func (cfg *ApiConfig) HandleGetAllChirps(w http.ResponseWriter, r *http.Request) {
+	// Get all chirps from the database
+	chirps, err := cfg.DbQueries.GetAllChirps(r.Context())
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get all chirps"})
+		return
+	}
+
+	// Map the chirps to the MappedChirp struct to control the JSON keys
+	var mappedChirps []MappedChirp
+	for _, chirp := range chirps {
+		mappedChirp := MappedChirp{
+			ID:        chirp.ID,
+			CreatedAt: chirp.CreatedAt,
+			UpdatedAt: chirp.UpdatedAt,
+			Body:      chirp.Body,
+			UserID:    chirp.UserID,
+		}
+		mappedChirps = append(mappedChirps, mappedChirp)
+	}
+
+	// Respond with 200 OK and a valid response if successful
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	// Create a new JSON encoder and configure it for pretty printing
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ") // Set indent with two spaces
+	encoder.Encode(mappedChirps)
 }
