@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -72,16 +73,16 @@ func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 // code and an error message. If the server encounters an internal error when
 // saving the chirp, it responds with a 500 status code and an error message.
 func (cfg *ApiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) {
-	// Parse the JSON body of the request into a ChirpRequest struct
-	var chirpRequest ChirpRequest
-	if err := json.NewDecoder(r.Body).Decode(&chirpRequest); err != nil {
+	// Parse the JSON body of the request into a CreateChirpRequest struct
+	var createChirpRequest CreateChirpRequest
+	if err := json.NewDecoder(r.Body).Decode(&createChirpRequest); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
 		return
 	}
 
 	// Check if the chirp exceeds the 140 character limit
-	if len(chirpRequest.Body) > 140 {
+	if len(createChirpRequest.Body) > 140 {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Chirp is too long"})
 		return
@@ -91,17 +92,17 @@ func (cfg *ApiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) 
 	profaneWords := []string{"kerfuffle", "sharbert", "fornax"}
 
 	// Replace profane words with **** in a case-insensitive manner
-	cleanedBody := chirpRequest.Body
+	cleanedBody := createChirpRequest.Body
 	caser := cases.Title(language.English)
 	for _, word := range profaneWords {
 		cleanedBody = strings.ReplaceAll(cleanedBody, word, "****")
 		cleanedBody = strings.ReplaceAll(cleanedBody, caser.String(word), "****")
 		cleanedBody = strings.ReplaceAll(cleanedBody, strings.ToUpper(word), "****")
 	}
-	chirpRequest.Body = cleanedBody
+	createChirpRequest.Body = cleanedBody
 
 	// If the chirp is valid, save it in the database
-	chirp, err := cfg.DbQueries.CreateChirp(r.Context(), database.CreateChirpParams(chirpRequest))
+	chirp, err := cfg.DbQueries.CreateChirp(r.Context(), database.CreateChirpParams(createChirpRequest))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to create chirp"})
@@ -191,4 +192,35 @@ func (cfg *ApiConfig) HandleGetAllChirps(w http.ResponseWriter, r *http.Request)
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ") // Set indent with two spaces
 	encoder.Encode(mappedChirps)
+}
+
+func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
+	// Get the chirp ID from the path parameter and convert it to a UUID object
+	pathParameter := r.PathValue("chirpID")
+	chirpID, err := uuid.Parse(pathParameter)
+	if err != nil {
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to convert path parameter to UUID"})
+		return
+	}
+
+	// Get the requested chirp from the database
+	chirp, err := cfg.DbQueries.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to find chirp with ID: " + pathParameter})
+		return
+	}
+
+	// Map the chirp struct to a MappedChirp struct to control the JSON keys
+	mappedChirp := MappedChirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
+	}
+
+	// If the chirp is found, respond with a 200 OK code and the found chirp
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(mappedChirp)
 }

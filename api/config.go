@@ -14,7 +14,7 @@ type ApiConfig struct {
 	Platform       string `env:"PLATFORM"`
 }
 
-type ChirpRequest struct {
+type CreateChirpRequest struct {
 	Body   string    `json:"body"`
 	UserID uuid.UUID `json:"user_id"`
 }
