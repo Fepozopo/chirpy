@@ -238,3 +238,41 @@ func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(mappedChirp)
 }
+
+func (cfg *ApiConfig) HandleLoginUser(w http.ResponseWriter, r *http.Request) {
+	// Parse the JSON body of the request into a LoginUserRequest struct
+	var loginUserRequest LoginUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&loginUserRequest); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		return
+	}
+
+	// Match the user email to an email in the database
+	user, err := cfg.DbQueries.GetUserByEmail(r.Context(), loginUserRequest.Email)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Incorrect email or password"})
+		return
+	}
+
+	// Check to see if their password matches the stored hash
+	if err := auth.CheckPasswordHash(loginUserRequest.Password, user.HashedPassword); err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Incorrect email or password"})
+		return
+	}
+
+	// Map user to the MappedUser strut in order to control the JSON keys
+	mappedUser := MappedUser{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email,
+	}
+
+	// If the email and passwords match, return a 200 OK response and a copy of the user resource
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(mappedUser)
+}

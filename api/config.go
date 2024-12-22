@@ -23,13 +23,14 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-type CleanedResponse struct {
-	CleanedBody string `json:"cleaned_body"`
-}
-
 type CreateUserRequest struct {
 	Email          string `json:"email"`
 	HashedPassword string `json:"password"`
+}
+
+type LoginUserRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type MappedUser struct {

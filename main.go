@@ -46,6 +46,7 @@ func mainHelper() int {
 	mux.HandleFunc("POST /api/users", apiCfg.HandleCreateUser)
 	mux.HandleFunc("GET /api/chirps", apiCfg.HandleGetAllChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.HandleGetChirp)
+	mux.HandleFunc("POST /api/login", apiCfg.HandleLoginUser)
 
 	// Custom FileServer to handle /app/ path
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))
