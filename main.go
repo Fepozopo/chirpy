@@ -20,8 +20,9 @@ func mainHelper() int {
 	filepathRoot := "./app"
 	port := "8080"
 
-	// Open a connection to the database
+	// Open a connection to the database and environment variables
 	godotenv.Load()
+	tokenSecret := os.Getenv("TOKEN_SECRET")
 	dbURL := os.Getenv("DB_URL")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -32,7 +33,8 @@ func mainHelper() int {
 	// Create a new Queries instance and initialize the ApiConfig struct
 	dbQueries := database.New(db)
 	apiCfg := &api.ApiConfig{
-		DbQueries: dbQueries,
+		DbQueries:   dbQueries,
+		TokenSecret: tokenSecret,
 	}
 
 	// Create a new ServeMux

@@ -12,6 +12,7 @@ type ApiConfig struct {
 	fileserverHits atomic.Int32
 	DbQueries      *database.Queries
 	Platform       string `env:"PLATFORM"`
+	TokenSecret    string `env:"TOKEN_SECRET"`
 }
 
 type CreateChirpRequest struct {
@@ -29,8 +30,9 @@ type CreateUserRequest struct {
 }
 
 type LoginUserRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email            string `json:"email"`
+	Password         string `json:"password"`
+	ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
 }
 
 type MappedUser struct {
@@ -38,6 +40,7 @@ type MappedUser struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+	Token     string    `json:"token,omitempty"`
 }
 
 type MappedChirp struct {

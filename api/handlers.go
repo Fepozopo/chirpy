@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
@@ -66,13 +67,12 @@ func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hits reset to 0 and all users deleted\n"))
 }
 
-// HandleCreateChirp creates a new chirp from the request body and saves it in the
-// database. It also performs some basic validation on the request body, such as
-// checking that the chirp is not too long and that it doesn't contain certain
-// profane words. If the chirp is valid, it responds with a 201 status code and
-// the full chirp resource. If the chirp is invalid, it responds with a 400 status
-// code and an error message. If the server encounters an internal error when
-// saving the chirp, it responds with a 500 status code and an error message.
+// HandleCreateChirp processes a request to create a new chirp. It parses the request
+// body into a CreateChirpRequest struct, validates the request with a JWT extracted
+// from the Authorization header, checks the chirp for a maximum length and removes
+// any profane words, and then stores the chirp in the database. If successful, it
+// returns a 201 status code with the chirp data; otherwise, it returns an error
+// status code with an appropriate error message.
 func (cfg *ApiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON body of the request into a CreateChirpRequest struct
 	var createChirpRequest CreateChirpRequest
@@ -81,6 +81,25 @@ func (cfg *ApiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) 
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
 		return
 	}
+
+	// Get the Bearer token from the request headers
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid authorization header"})
+		return
+	}
+
+	// Validate the JWT
+	userID, err := auth.ValidateJWT(token, cfg.TokenSecret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid JWT"})
+		return
+	}
+
+	// Set the user ID in the request body
+	createChirpRequest.UserID = userID
 
 	// Check if the chirp exceeds the 140 character limit
 	if len(createChirpRequest.Body) > 140 {
@@ -152,7 +171,7 @@ func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Map user to the MappedUser strut in order to control the JSON keys
+	// Map user to the MappedUser struct in order to control the JSON keys
 	mappedUser := MappedUser{
 		ID:        user.ID,
 		CreatedAt: user.CreatedAt,
@@ -239,6 +258,11 @@ func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(mappedChirp)
 }
 
+// HandleLoginUser checks the provided email and password against the database.
+// If the credentials match, it generates a JWT token with the user's ID and sets
+// the Authorization header with the token. It responds with a 200 OK status and
+// a copy of the user resource with the token. If the credentials do not match,
+// it responds with a 401 Unauthorized status and an error message.
 func (cfg *ApiConfig) HandleLoginUser(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON body of the request into a LoginUserRequest struct
 	var loginUserRequest LoginUserRequest
@@ -263,15 +287,39 @@ func (cfg *ApiConfig) HandleLoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Map user to the MappedUser strut in order to control the JSON keys
+	// Set the expiration time based on request body if provided
+	var token string
+	if loginUserRequest.ExpiresInSeconds != nil {
+		expirationTime := time.Now().Add(time.Duration(*loginUserRequest.ExpiresInSeconds) * time.Second)
+		var err error
+		token, err = auth.MakeJWT(user.ID, cfg.TokenSecret, expirationTime.Sub(time.Now()))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate JWT"})
+			return
+		}
+		w.Header().Set("Authorization", "Bearer "+token)
+	} else {
+		var err error
+		token, err = auth.MakeJWT(user.ID, cfg.TokenSecret, 3600*time.Second)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate JWT"})
+			return
+		}
+		w.Header().Set("Authorization", "Bearer "+token)
+	}
+
+	// Map user to the MappedUser struct in order to control the JSON keys
 	mappedUser := MappedUser{
 		ID:        user.ID,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
+		Token:     token,
 	}
 
-	// If the email and passwords match, return a 200 OK response and a copy of the user resource
+	// If the email and passwords match, return a 200 OK response and a copy of the user resource with the token
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(mappedUser)
