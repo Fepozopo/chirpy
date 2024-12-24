@@ -258,11 +258,15 @@ func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(mappedChirp)
 }
 
-// HandleLoginUser checks the provided email and password against the database.
-// If the credentials match, it generates a JWT token with the user's ID and sets
-// the Authorization header with the token. It responds with a 200 OK status and
-// a copy of the user resource with the token. If the credentials do not match,
-// it responds with a 401 Unauthorized status and an error message.
+// HandleLoginUser processes a login request by verifying the user's email
+// and password. It expects a JSON request body containing the user's email
+// and password, which is parsed into a LoginUserRequest struct. The function
+// retrieves the user from the database using the provided email and checks
+// if the password matches the stored hash. If the credentials are valid, it
+// generates a JWT access token and a refresh token, adds the refresh token
+// to the database, and returns a 200 OK response with the user's details,
+// access token, and refresh token. If the request body is invalid, or the
+// email or password is incorrect, it returns an appropriate error response.
 func (cfg *ApiConfig) HandleLoginUser(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON body of the request into a LoginUserRequest struct
 	var loginUserRequest LoginUserRequest
@@ -287,40 +291,109 @@ func (cfg *ApiConfig) HandleLoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set the expiration time based on request body if provided
-	var token string
-	if loginUserRequest.ExpiresInSeconds != nil {
-		expirationTime := time.Now().Add(time.Duration(*loginUserRequest.ExpiresInSeconds) * time.Second)
-		var err error
-		token, err = auth.MakeJWT(user.ID, cfg.TokenSecret, expirationTime.Sub(time.Now()))
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate JWT"})
-			return
-		}
-		w.Header().Set("Authorization", "Bearer "+token)
-	} else {
-		var err error
-		token, err = auth.MakeJWT(user.ID, cfg.TokenSecret, 3600*time.Second)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate JWT"})
-			return
-		}
-		w.Header().Set("Authorization", "Bearer "+token)
+	// Set the expiration time for the access token (JWT) to 1 hour
+	token, err := auth.MakeJWT(user.ID, cfg.TokenSecret, 3600*time.Second)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate JWT"})
+		return
+	}
+	w.Header().Set("Authorization", "Bearer "+token)
+
+	// Create a refresh token and insert it into the database
+	makeRefreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate refresh token"})
+		return
+	}
+
+	createRefreshToken := database.CreateRefreshTokenParams{
+		Token:  makeRefreshToken,
+		UserID: user.ID,
+	}
+
+	if cfg.DbQueries.CreateRefreshToken(r.Context(), createRefreshToken) != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to add refresh token to database"})
+		return
 	}
 
 	// Map user to the MappedUser struct in order to control the JSON keys
 	mappedUser := MappedUser{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-		Token:     token,
+		ID:           user.ID,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		Email:        user.Email,
+		Token:        token,
+		RefreshToken: makeRefreshToken,
 	}
 
 	// If the email and passwords match, return a 200 OK response and a copy of the user resource with the token
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(mappedUser)
+}
+
+// HandleRefresh processes a request to refresh a user's access token using
+// their refresh token. It expects the refresh token to be provided in the
+// Authorization header of the request. If the token is missing or invalid,
+// it returns an appropriate error response. If the token is valid, it
+// generates a new access token and returns it in the response body. If there
+// is an error generating the new token, it responds with a 500 status and an
+// error message.
+func (cfg *ApiConfig) HandleRefresh(w http.ResponseWriter, r *http.Request) {
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Missing refresh token"})
+		return
+	}
+
+	user, err := cfg.DbQueries.GetUserFromRefreshToken(r.Context(), refreshToken)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid refresh token"})
+		return
+	}
+
+	if user.RevokedAt.Valid {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Refresh token is expired"})
+		return
+	}
+
+	token, err := auth.MakeJWT(user.ID, cfg.TokenSecret, 3600*time.Second)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to generate JWT"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(NewJWT{Token: token})
+}
+
+// HandleRevoke processes a request to revoke a user's refresh token.
+// It extracts the refresh token from the Authorization header, validates it,
+// and marks the associated refresh token as revoked in the database. If the
+// refresh token is missing or invalid, or if there is an error storing the
+// revocation, it responds with an appropriate error status and error message.
+func (cfg *ApiConfig) HandleRevoke(w http.ResponseWriter, r *http.Request) {
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Missing refresh token"})
+		return
+	}
+
+	err = cfg.DbQueries.RevokeRefreshToken(r.Context(), refreshToken)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to revoke refresh token"})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
