@@ -232,13 +232,15 @@ func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
 	pathParameter := r.PathValue("chirpID")
 	chirpID, err := uuid.Parse(pathParameter)
 	if err != nil {
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to convert path parameter to UUID"})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid chirp ID"})
 		return
 	}
 
 	// Get the requested chirp from the database
 	chirp, err := cfg.DbQueries.GetChirp(r.Context(), chirpID)
 	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to find chirp with ID: " + pathParameter})
 		return
 	}
@@ -459,4 +461,58 @@ func (cfg *ApiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(mappedUser)
+}
+
+// HandleDeleteChirp deletes a chirp from the database by its ID. The function expects
+// the chirp ID to be provided as a path parameter and the user's JWT to be provided
+// in the Authorization header. It validates the JWT and checks if the chirp belongs
+// to the authenticated user. If the chirp ID is invalid, the JWT is missing or invalid,
+// or if the chirp does not belong to the user, it responds with an appropriate error
+// status and message. If the chirp is successfully deleted, it responds with a 204
+// No Content status.
+func (cfg *ApiConfig) HandleDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	// Get the chirp ID from the path parameter and convert it to a UUID object
+	pathParameter := r.PathValue("chirpID")
+	chirpID, err := uuid.Parse(pathParameter)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid chirp ID"})
+		return
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid authorization header"})
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.TokenSecret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid JWT"})
+		return
+	}
+
+	chirp, err := cfg.DbQueries.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Chirp not found"})
+		return
+	}
+
+	if chirp.UserID != userID {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "You can only delete your own chirps"})
+		return
+	}
+
+	err = cfg.DbQueries.DeleteChirp(r.Context(), chirpID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to delete chirp"})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
