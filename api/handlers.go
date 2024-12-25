@@ -397,3 +397,66 @@ func (cfg *ApiConfig) HandleRevoke(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// HandleUpdateUser processes a request to update a user's email and/or password.
+// It expects the user to provide an access token in the Authorization header,
+// and the new email and password in the request body. If the access token is
+// missing or invalid, it responds with a 401 status code and an appropriate
+// error message. It hashes the new password and updates the user in the
+// database with the new email and hashed password. If there is an error
+// storing the update, it responds with a 500 status code and an appropriate
+// error message. Otherwise, it responds with a 200 status code and the newly
+// updated User resource.
+func (cfg *ApiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Missing access token"})
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.TokenSecret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid access token"})
+		return
+	}
+
+	var updateUserRequest UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&updateUserRequest); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		return
+	}
+
+	hashedPassword, err := auth.HashPassword(updateUserRequest.Password)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to hash password"})
+		return
+	}
+
+	updateUserParams := database.UpdateUserParams{
+		ID:             userID,
+		Email:          updateUserRequest.Email,
+		HashedPassword: hashedPassword,
+	}
+
+	user, err := cfg.DbQueries.UpdateUser(r.Context(), updateUserParams)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to update user"})
+		return
+	}
+
+	mappedUser := MappedUser{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(mappedUser)
+}

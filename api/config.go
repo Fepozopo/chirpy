@@ -38,6 +38,11 @@ type NewJWT struct {
 	Token string `json:"token"`
 }
 
+type UpdateUserRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type MappedUser struct {
 	ID           uuid.UUID `json:"id"`
 	CreatedAt    time.Time `json:"created_at"`

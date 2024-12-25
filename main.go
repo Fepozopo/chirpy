@@ -51,6 +51,7 @@ func mainHelper() int {
 	mux.HandleFunc("POST /api/login", apiCfg.HandleLoginUser)
 	mux.HandleFunc("POST /api/refresh", apiCfg.HandleRefresh)
 	mux.HandleFunc("POST /api/revoke", apiCfg.HandleRevoke)
+	mux.HandleFunc("PUT /api/users", apiCfg.HandleUpdateUser)
 
 	// Custom FileServer to handle /app/ path
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))
