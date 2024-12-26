@@ -53,6 +53,7 @@ func mainHelper() int {
 	mux.HandleFunc("POST /api/revoke", apiCfg.HandleRevoke)
 	mux.HandleFunc("PUT /api/users", apiCfg.HandleUpdateUser)
 	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.HandleDeleteChirp)
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.HandleStripeEvent)
 
 	// Custom FileServer to handle /app/ path
 	fileServer := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))

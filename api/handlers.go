@@ -173,10 +173,11 @@ func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Map user to the MappedUser struct in order to control the JSON keys
 	mappedUser := MappedUser{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 
 	// Respond with 200 OK and a valid response if the user was created successfully
@@ -327,6 +328,7 @@ func (cfg *ApiConfig) HandleLoginUser(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 		Email:        user.Email,
+		IsChirpyRed:  user.IsChirpyRed,
 		Token:        token,
 		RefreshToken: makeRefreshToken,
 	}
@@ -452,10 +454,11 @@ func (cfg *ApiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mappedUser := MappedUser{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -511,6 +514,37 @@ func (cfg *ApiConfig) HandleDeleteChirp(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to delete chirp"})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleStripeEvent is a webhook handler for Stripe events. It is used to
+// upgrade a user to Chirpy Red when they subscribe to the Chirpy Red plan.
+// It expects the user ID in the request body and updates the user in the
+// database with the new Chirpy Red plan. If the request body is invalid, it
+// responds with a 400 status code and an error message. If the user is not
+// found, it responds with a 404 status code and an error message. Otherwise,
+// it responds with a 204 status code.
+func (cfg *ApiConfig) HandleStripeEvent(w http.ResponseWriter, r *http.Request) {
+	var stripeEvent StripeEvent
+	err := json.NewDecoder(r.Body).Decode(&stripeEvent)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		return
+	}
+
+	if stripeEvent.Event != "user.upgraded" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	err = cfg.DbQueries.UpgradeUserToChirpyRed(r.Context(), stripeEvent.Data.UserID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to find user"})
 		return
 	}
 
