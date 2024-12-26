@@ -193,12 +193,27 @@ func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 // array of chirps. If there is an error accessing the database, it responds
 // with a 500 status and an error message.
 func (cfg *ApiConfig) HandleGetAllChirps(w http.ResponseWriter, r *http.Request) {
-	// Get all chirps from the database
-	chirps, err := cfg.DbQueries.GetAllChirps(r.Context())
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get all chirps"})
-		return
+
+	// Check if the author_id query parameter is provided
+	authorID := r.URL.Query().Get("author_id")
+	var chirps []database.Chirp
+	var err error
+	if authorID != "" {
+		// Get all chirps for the given author
+		chirps, err = cfg.DbQueries.GetUserChirps(r.Context(), uuid.MustParse(authorID))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get chirps for author"})
+			return
+		}
+	} else {
+		// Get all chirps from the database
+		chirps, err = cfg.DbQueries.GetAllChirps(r.Context())
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get all chirps"})
+			return
+		}
 	}
 
 	// Map the chirps to the MappedChirp struct to control the JSON keys
