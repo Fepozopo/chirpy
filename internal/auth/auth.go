@@ -98,3 +98,18 @@ func MakeRefreshToken() (string, error) {
 	}
 	return hex.EncodeToString(b), nil
 }
+
+// GetAPIKey extracts the API key from the Authorization header
+// of the provided http.Header. It returns the key as a string and an
+// error if the header does not exist or the key is invalid.
+func GetAPIKey(headers http.Header) (string, error) {
+	authHeader := headers.Get("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("authorization header does not exist")
+	}
+	apiKey := strings.TrimSpace(strings.TrimPrefix(authHeader, "ApiKey "))
+	if apiKey == "" {
+		return "", fmt.Errorf("authorization header is invalid")
+	}
+	return apiKey, nil
+}

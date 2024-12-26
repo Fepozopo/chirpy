@@ -24,6 +24,8 @@ func mainHelper() int {
 	godotenv.Load()
 	tokenSecret := os.Getenv("TOKEN_SECRET")
 	dbURL := os.Getenv("DB_URL")
+	stripeKey := os.Getenv("STRIPE_KEY")
+
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Printf("Failed to open a connection to the database: %v\n", err)
@@ -35,6 +37,7 @@ func mainHelper() int {
 	apiCfg := &api.ApiConfig{
 		DbQueries:   dbQueries,
 		TokenSecret: tokenSecret,
+		StripeKey:   stripeKey,
 	}
 
 	// Create a new ServeMux

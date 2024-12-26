@@ -520,13 +520,16 @@ func (cfg *ApiConfig) HandleDeleteChirp(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// HandleStripeEvent is a webhook handler for Stripe events. It is used to
-// upgrade a user to Chirpy Red when they subscribe to the Chirpy Red plan.
-// It expects the user ID in the request body and updates the user in the
-// database with the new Chirpy Red plan. If the request body is invalid, it
-// responds with a 400 status code and an error message. If the user is not
-// found, it responds with a 404 status code and an error message. Otherwise,
-// it responds with a 204 status code.
+// HandleStripeEvent handles a Stripe event and upgrades the corresponding user
+// to a Chirpy Red subscription if the event is user.upgraded. It expects the
+// event to be passed in the request body as a StripeEvent struct, and expects
+// the Stripe API key to be passed in the Authorization header. If the event
+// is invalid, it responds with a 400 status code and an appropriate error
+// message. If the API key is invalid, it responds with a 403 status code and
+// an appropriate error message. If the user is not found, it responds with a
+// 404 status code and an appropriate error message. If the event is not
+// user.upgraded, it responds with a 204 status code. Otherwise, it upgrades
+// the user and responds with a 204 status code.
 func (cfg *ApiConfig) HandleStripeEvent(w http.ResponseWriter, r *http.Request) {
 	var stripeEvent StripeEvent
 	err := json.NewDecoder(r.Body).Decode(&stripeEvent)
@@ -538,6 +541,19 @@ func (cfg *ApiConfig) HandleStripeEvent(w http.ResponseWriter, r *http.Request) 
 
 	if stripeEvent.Event != "user.upgraded" {
 		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Authorization header is invalid"})
+		return
+	}
+
+	if apiKey != cfg.StripeKey {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid API key"})
 		return
 	}
 

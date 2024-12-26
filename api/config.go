@@ -13,6 +13,7 @@ type ApiConfig struct {
 	DbQueries      *database.Queries
 	Platform       string `env:"PLATFORM"`
 	TokenSecret    string `env:"TOKEN_SECRET"`
+	StripeKey      string `env:"STRIPE_KEY"`
 }
 
 type CreateChirpRequest struct {
