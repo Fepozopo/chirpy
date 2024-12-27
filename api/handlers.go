@@ -186,33 +186,56 @@ func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(mappedUser)
 }
 
-// HandleGetAllChirps retrieves all chirps from the database and returns them
-// as a JSON array in the response. It maps the database chirp records to the
-// MappedChirp struct to ensure consistent JSON keys. If the operation is
-// successful, it responds with a 200 OK status and a pretty-printed JSON
-// array of chirps. If there is an error accessing the database, it responds
-// with a 500 status and an error message.
+// HandleGetAllChirps retrieves all chirps from the database and returns them as a
+// JSON object in the response. The query parameter "author_id" can be used to
+// retrieve all chirps for the given author. The query parameter "sort" can be used
+// to sort the chirps in ascending or descending order of their creation date.
+// If there is an error retrieving the chirps, it responds with an appropriate error
+// status and message. If the chirps are successfully retrieved, it responds with a
+// 200 OK status and a valid JSON response.
 func (cfg *ApiConfig) HandleGetAllChirps(w http.ResponseWriter, r *http.Request) {
 
-	// Check if the author_id query parameter is provided
+	// Check if the author_id and/or the sort query parameter is provided
 	authorID := r.URL.Query().Get("author_id")
+	sort := r.URL.Query().Get("sort")
+
 	var chirps []database.Chirp
 	var err error
-	if authorID != "" {
-		// Get all chirps for the given author
-		chirps, err = cfg.DbQueries.GetUserChirps(r.Context(), uuid.MustParse(authorID))
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get chirps for author"})
-			return
+	if sort == "desc" {
+		if authorID != "" {
+			// Get all chirps for the given author
+			chirps, err = cfg.DbQueries.GetUserChirpsDESC(r.Context(), uuid.MustParse(authorID))
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get chirps for author"})
+				return
+			}
+		} else {
+			// Get all chirps from the database
+			chirps, err = cfg.DbQueries.GetAllChirpsDESC(r.Context())
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get all chirps"})
+				return
+			}
 		}
 	} else {
-		// Get all chirps from the database
-		chirps, err = cfg.DbQueries.GetAllChirps(r.Context())
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get all chirps"})
-			return
+		if authorID != "" {
+			// Get all chirps for the given author
+			chirps, err = cfg.DbQueries.GetUserChirps(r.Context(), uuid.MustParse(authorID))
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get chirps for author"})
+				return
+			}
+		} else {
+			// Get all chirps from the database
+			chirps, err = cfg.DbQueries.GetAllChirps(r.Context())
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(ErrorResponse{Error: "Failed to get all chirps"})
+				return
+			}
 		}
 	}
 
