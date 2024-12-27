@@ -1,4 +1,2 @@
 .env
 chirpy
-sql/schema/migration_up.sh
-sql/schema/migration_down.sh
