@@ -27,7 +27,7 @@ A RESTful API for a social media platform inspired by Twitter, built with Go and
 2. Install Go: `go install`
 3. Install PostgreSQL: `brew install postgresql` (on macOS)
 4. Create a PostgreSQL database: `createdb chirpy`
-5. Initialize the database schema: `sql/schema/migration_up.sh`
+5. Initialize the database schema: `goose postgres 'DB_URL' up`
 6. Set environment variables (see below)
 7. Run the API: `go run .`
 
